@@ -3,20 +3,89 @@ const express = require('express');
 const morgan = require('morgan');
 const cors = require('cors');
 const helmet = require('helmet');
-const { NODE_ENV } = require('./config');
+const { NODE_ENV, PORT, API_TOKEN } = require('./config');
+const { v4: uuid } = require('uuid');
 
 const app = express();
 
 const morganOption = NODE_ENV === 'production' ? 'tiny' : 'common';
 
+const user = [];
+
+const auth = (req, res, next) => {
+	const apiToken = API_TOKEN;
+
+	const authToken = req.get('Authorization');
+	console.log(apiToken, authToken);
+	if (!authToken || authToken.split(' ')[1] !== apiToken) {
+		return res.status(401).json({ error: 'Unauthorized request' });
+	}
+	next();
+};
+
 // Middlewares
 app.use(morgan(morganOption));
 app.use(helmet());
 app.use(cors());
+app.use(express.json());
 
 //Routes
-app.get('/', (req, res) => {
-	res.send('Hello, world!');
+app.get('/address', (req, res) => {
+	res.status(201).json(user);
+});
+
+app.post('/address', auth, (req, res) => {
+	console.log('req.body = ', req.body);
+	const {
+		firstName,
+		lastName,
+		address1,
+		address2,
+		city,
+		state,
+		zip,
+	} = req.body;
+
+	if (!firstName) {
+		return res.status(400).send('FirstName is required');
+	}
+	if (!lastName) {
+		return res.status(400).send('lastName is required');
+	}
+	if (!address1) {
+		return res.status(400).send('address1 is required');
+	}
+	if (!city) {
+		return res.status(400).send('city is required');
+	}
+	if (!state || state.length !== 2) {
+		return res.status(400).send('state is required and must ');
+	}
+
+	if (!zip || zip.length !== 5) {
+		return res.status(400).send('Zip must be five digit number.');
+	}
+
+	//Build user info
+	const id = uuid();
+	const newUser = {
+		firstName,
+		lastName,
+		address1,
+		address2,
+		city,
+		state,
+		zip,
+		id,
+	};
+
+	//Save user in db
+	user.push(newUser);
+
+	res
+		.status(201)
+		.location(`http://localhost:${PORT}/address/:${id}`)
+		.json(newUser);
 });
 
 //Error Handler Middleware
